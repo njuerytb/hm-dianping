@@ -1,36 +1,31 @@
 package com.hmdp.utils;
 
+import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.util.StrUtil;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.User;
+import io.netty.util.internal.StringUtil;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
+import java.security.Key;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 public class LoginInterceptor implements HandlerInterceptor {
+    private StringRedisTemplate stringRedisTemplate;
+    public LoginInterceptor(StringRedisTemplate stringRedisTemplate) {
+        this.stringRedisTemplate = stringRedisTemplate;
+    }
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-        //1.获取session
-        HttpSession session = request.getSession();
-        //2.获取session中的用户（这里必须用 User！！！）
-        User user = (User) session.getAttribute("user");
-
-        //3.判断用户是否存在
-        if (user == null) {
-            //4.不存在，拦截，返回401
+        if (UserHolder.getUser()==null){
             response.setStatus(401);
             return false;
         }
-
-        // 5. 把 User 转成 UserDTO 再存！！！ 关键修复
-        UserDTO userDTO = new UserDTO();
-        userDTO.setId(user.getId());
-        userDTO.setNickName(user.getNickName());
-        userDTO.setIcon(user.getIcon());
-
-        // 6. 存 DTO
-        UserHolder.saveUser(userDTO);
         return true;
     }
 
