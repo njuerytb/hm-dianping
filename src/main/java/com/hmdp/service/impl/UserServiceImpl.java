@@ -14,12 +14,16 @@ import com.hmdp.utils.RegexUtils;
 import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.ibatis.annotations.Mapper;
+import org.springframework.data.redis.connection.BitFieldSubCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpSession;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -73,5 +77,58 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         user.setNickName("user_" + RandomUtil.randomString(10));
         save(user);
         return user;
+    }
+    @Override
+    public Result sign() {
+        //1.获取当前登录用户
+        Long userId = UserHolder.getUser().getId();
+        //2.获取日期
+        LocalDateTime now = LocalDateTime.now();
+        //3.拼接key
+      String key = "sign:" + userId + ":" +  now.format(DateTimeFormatter.ofPattern("yyyyMM"));
+        //4.获取今天是本月的第几天
+        int dayOfMonth = now.getDayOfMonth();
+        //5.写入Redis
+        stringRedisTemplate.opsForValue().setBit(key, dayOfMonth-1, true);
+        return Result.ok();
+    }
+    @Override
+    public Result signCount() {
+        //1.获取当前登录用户
+        Long userId = UserHolder.getUser().getId();
+        //2.获取日期
+        LocalDateTime now = LocalDateTime.now();
+        //3.拼接key
+        String key = "sign:" + userId + ":" +  now.format(DateTimeFormatter.ofPattern("yyyyMM"));
+        //4.获取今天是本月的第几天
+        int dayOfMonth = now.getDayOfMonth();
+        //5.获取本月截止今天所有的签到记录，返回的是十进制的数字
+     List<Long> result = stringRedisTemplate.opsForValue().bitField(
+                key,
+                BitFieldSubCommands.create().get(BitFieldSubCommands.BitFieldType.unsigned(dayOfMonth)).valueAt(0)
+        );
+     if (result == null || result.isEmpty()){
+         return Result.ok(0);
+     }
+     Long num = result.get(0);
+        if (num == 0|| num == null){
+            return Result.ok(0);
+        }
+        //6.循环遍历
+        int count = 0;
+        while (true){
+            //7.与1与运算得到最后一个bit位
+            if ((num & 1) == 0){
+                //判断是否为零
+                //如果为零，未签到，结束
+                break;
+            }else {
+        //如果不为零，已签到，计数器加
+                //把数字右移1
+                count++;
+            }
+            num >>>= 1;
+        }
+        return Result.ok(count);
     }
 }
