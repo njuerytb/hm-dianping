@@ -1,7 +1,9 @@
 package com.hmdp;
 
 import cn.hutool.json.JSON;
+import com.hmdp.entity.SeckillVoucher;
 import com.hmdp.entity.Shop;
+import com.hmdp.service.ISeckillVoucherService;
 import com.hmdp.service.IShopService;
 import com.hmdp.service.impl.ShopServiceImpl;
 import com.hmdp.utils.RedisIdWorker;
@@ -68,4 +70,18 @@ private StringRedisTemplate stringRedisTemplate;
         stringRedisTemplate.opsForGeo().add(key,locations);
     }
 }
+
+@Resource
+private ISeckillVoucherService seckillVoucherService;
+    @Test
+    public void syncAllSeckillStockToRedis() {
+        // 查询所有秒杀券
+        List<SeckillVoucher> list = seckillVoucherService.list();
+        for (SeckillVoucher voucher : list) {
+            // 同步库存到Redis
+            stringRedisTemplate.opsForValue()
+                    .set("seckill:stock:" + voucher.getVoucherId(), voucher.getStock().toString());
+            System.out.println("✅ 同步券ID:" + voucher.getVoucherId() + " 库存:" + voucher.getStock());
+        }
+    }
 }
